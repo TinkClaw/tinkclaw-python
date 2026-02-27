@@ -40,7 +40,7 @@ class MomentumBot(Strategy):
 
 if __name__ == "__main__":
     # Initialize TinkClaw client
-    client = TinkClawClient(api_key="openclaw_builder_94e48d5e6c667e3f71de7bfa5b32e920")
+    client = TinkClawClient(api_key="tinkclaw_free_YOUR_API_KEY")
 
     # Initialize bot
     bot = MomentumBot(
