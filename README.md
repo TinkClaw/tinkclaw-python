@@ -225,6 +225,10 @@ MIT License - see LICENSE file
 - [ ] CLI tool for quick testing
 - [ ] Jupyter notebook examples
 
+## Disclaimer
+
+TinkClaw provides quantitative market data and analytics for informational purposes only. It is not a registered investment adviser, broker-dealer, or financial planner. The API is read-only — it returns data and does not manage user accounts or funds. The optional broker integrations in this SDK are local developer utilities that run entirely on the user's machine using the user's own credentials. All trading and investment decisions are made solely by the user. Past statistical patterns do not guarantee future results.
+
 ## Credits
 
 Built by [TinkClaw](https://tinkclaw.com) — Quant intelligence for trading bots.
