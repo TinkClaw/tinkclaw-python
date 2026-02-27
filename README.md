@@ -11,7 +11,7 @@ Build trading bots in minutes using confluence signals powered by Hurst exponent
 - Key management (info, rotation with 24h grace period)
 - Webhook subscriptions for real-time alerts
 - Alpaca paper trading integration
-- Local backtesting harness
+- Server-side backtesting via API
 - Full typing support
 - Zero heavy dependencies (just `requests`)
 
@@ -220,7 +220,7 @@ MIT License - see LICENSE file
 - [x] Publish to PyPI
 - [x] Key management (info, rotation)
 - [ ] Add more broker integrations (Interactive Brokers, Coinbase)
-- [ ] Complete backtesting engine with performance metrics
+- [ ] Local backtesting engine with performance metrics (currently server-side)
 - [ ] Add WebSocket streaming for real-time signals
 - [ ] CLI tool for quick testing
 - [ ] Jupyter notebook examples
