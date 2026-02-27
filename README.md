@@ -227,4 +227,4 @@ MIT License - see LICENSE file
 
 ## Credits
 
-Built by [Meshcue](https://meshcue.com) - Global platform for quant intelligence.
+Built by [TinkClaw](https://tinkclaw.com) — Quant intelligence for trading bots.
