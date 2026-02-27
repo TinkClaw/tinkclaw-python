@@ -6,20 +6,16 @@ Build trading bots in minutes using confluence signals powered by Hurst exponent
 
 ## Features
 
-- Simple API wrapper for TinkClaw endpoints
+- Simple API wrapper for all TinkClaw endpoints
 - Strategy base class for custom bot logic
+- Key management (info, rotation with 24h grace period)
+- Webhook subscriptions for real-time alerts
 - Alpaca paper trading integration
 - Local backtesting harness
 - Full typing support
 - Zero heavy dependencies (just `requests`)
 
 ## Installation
-
-```bash
-pip install -e .
-```
-
-Or from PyPI (coming soon):
 
 ```bash
 pip install tinkclaw
@@ -30,7 +26,7 @@ pip install tinkclaw
 ### 1. Get Your API Key
 
 1. Visit [https://tinkclaw.com](https://tinkclaw.com)
-2. Sign up for free Developer tier (50 calls/day)
+2. Sign up for the Free tier (500 calls/day)
 3. Copy your API key
 
 ### 2. Basic Usage
@@ -38,16 +34,19 @@ pip install tinkclaw
 ```python
 from tinkclaw import TinkClawClient
 
-# Initialize client
-client = TinkClawClient(api_key="your_key_here")
+client = TinkClawClient(api_key="tinkclaw_free_YOUR_KEY")
 
-# Get confluence score
+# Get trading signals
+signals = client.get_signals(["BTC", "ETH"])
+for s in signals:
+    print(f"{s['symbol']}: {s['signal']} ({s['confidence']}%)")
+
+# Get confluence score (6-layer weighted)
 confluence = client.get_confluence("BTC")
+print(f"Score: {confluence['score']}/100 — {confluence['recommendation']}")
 
-print(f"Symbol: {confluence['symbol']}")
-print(f"Score: {confluence['score']}")        # 0-100
-print(f"Signal: {confluence['signal']}")      # strong_buy, buy, hold, sell, strong_sell
-print(f"Setup: {confluence['setup_type']}")   # trending, mean_reverting, uncertain
+# Check remaining calls
+print(f"Calls remaining: {client.calls_remaining}")
 ```
 
 ### 3. Build a Trading Bot
@@ -60,32 +59,14 @@ class MomentumBot(Strategy):
         score = confluence['score']
         setup = confluence['setup_type']
 
-        # Buy on strong confluence + trending regime
         if score > 75 and setup == 'trending':
             self.buy(symbol, size=100)
-
-        # Sell on weak confluence
         elif score < 40:
             self.sell(symbol, size=100)
 
-# Run bot
-client = TinkClawClient(api_key="your_key_here")
+client = TinkClawClient(api_key="tinkclaw_free_YOUR_KEY")
 bot = MomentumBot(symbols=['BTC', 'ETH', 'SOL'], client=client)
-bot.run(interval_hours=4)  # Check every 4 hours
-```
-
-Output:
-```
-[TINKCLAW] Starting strategy for 3 symbols
-[TINKCLAW] Check interval: 4 hours
-
-[TINKCLAW] Iteration 1 - 2026-02-21T10:00:00
-[SIGNAL] BTC: score=78, signal=strong_buy, setup=trending
-[SIGNAL] Buy 100 BTC (Strong trending signal (score=78))
-[SIGNAL] ETH: score=65, signal=buy, setup=trending
-[HOLD] ETH: position=0, score=65, setup=trending
-[SIGNAL] SOL: score=42, signal=hold, setup=uncertain
-[HOLD] SOL: position=0, score=42, setup=uncertain
+bot.run(interval_hours=4)
 ```
 
 ### 4. Integrate with Alpaca Paper Trading
@@ -94,27 +75,18 @@ Output:
 from tinkclaw import TinkClawClient, Strategy
 from tinkclaw.brokers import AlpacaBroker
 
-# Initialize broker
 broker = AlpacaBroker(
     api_key="your_alpaca_key",
     secret_key="your_alpaca_secret",
-    paper=True  # Paper trading
+    paper=True
 )
 
-# Initialize strategy with broker
 bot = MomentumBot(
     symbols=['AAPL', 'TSLA', 'NVDA'],
     client=client,
-    broker=broker  # Trades will execute on Alpaca
+    broker=broker
 )
-
 bot.run(interval_hours=4)
-```
-
-Output:
-```
-[EXECUTE] Buy 100 AAPL via AlpacaBroker
-[EXECUTE] Sell 50 TSLA via AlpacaBroker
 ```
 
 ## API Reference
@@ -122,25 +94,42 @@ Output:
 ### TinkClawClient
 
 ```python
-client = TinkClawClient(api_key="your_key")
+client = TinkClawClient(api_key="tinkclaw_free_YOUR_KEY")
 
-# Get confluence score
-confluence = client.get_confluence("BTC")
+# Signals
+signals = client.get_signals(["BTC", "ETH"])         # BUY/SELL/HOLD signals
+ml_signals = client.get_signals_ml(["BTC"])           # ML-enhanced signals
 
-# Multi-timeframe analysis
-confluence = client.get_confluence("BTC", timeframes=[7, 30, 90, 365])
-
-# Get technical indicators
+# Analysis
+analysis = client.get_analysis("BTC")                 # Technical analysis
+confluence = client.get_confluence("BTC")              # 6-layer confluence score
 indicators = client.get_indicators("ETH", range_days=30)
 
-# Get historical signals
-history = client.get_history("SOL", limit=100)
+# Quant
+risk = client.get_risk_metrics(["BTC", "ETH"])         # VaR, Sharpe, Sortino
+correlation = client.get_correlation(["BTC", "ETH"])    # Correlation matrix
+screener = client.get_screener()                        # All 34 assets at a glance
+cross = client.get_cross_market("BTC")                  # Crypto-to-stock correlations
 
-# Get top signals across all assets
-top = client.get_top_signals(min_score=70, limit=10)
+# Market Data
+summary = client.get_market_summary()                   # Market overview
+news = client.get_news("BTC")                           # Financial news
+indices = client.get_indices()                           # Global stock indices
+symbols = client.get_symbols()                           # Supported symbols
 
-# Health check
-health = client.health()
+# Backtesting
+result = client.backtest("BTC", strategy="hurst_momentum", days=365)
+
+# Webhooks
+client.subscribe_webhook("https://your-server.com/hook", "BTC", "confluence_gte", 80)
+hooks = client.list_webhooks()
+client.delete_webhook("wh_abc123")
+
+# Account
+usage = client.get_usage()                              # Daily usage stats
+info = client.key_info()                                # Key metadata + quota
+rotated = client.rotate_key()                           # Issue new key (24h grace)
+health = client.health()                                # API health check
 ```
 
 ### Strategy Base Class
@@ -148,8 +137,7 @@ health = client.health()
 ```python
 class MyBot(Strategy):
     def on_signal(self, symbol, confluence):
-        # Your strategy logic here
-        pass
+        pass  # Your strategy logic
 
 bot = MyBot(symbols=['BTC'], client=client, broker=None)
 bot.run(interval_hours=4)
@@ -170,17 +158,12 @@ from tinkclaw.brokers import AlpacaBroker
 broker = AlpacaBroker(
     api_key="your_key",
     secret_key="your_secret",
-    paper=True  # Use paper trading
+    paper=True
 )
 
-# Place orders
 broker.buy("AAPL", size=10)
 broker.sell("AAPL", size=10)
-
-# Get position
 position = broker.get_position("AAPL")
-
-# Get account info
 account = broker.get_account()
 ```
 
@@ -191,86 +174,35 @@ See `examples/` directory:
 - **momentum_bot.py** - Complete working bot using confluence signals
 - **quickstart.md** - 5-minute integration guide
 
-Run the example:
-
 ```bash
 python examples/momentum_bot.py
 ```
 
 ## Rate Limits
 
-| Tier | Calls/Day | Price | Use Case |
+| Plan | Calls/Day | Price | Use Case |
 |------|-----------|-------|----------|
-| Developer | 50 | Free | Testing (3 assets x 6 checks/day) |
-| Builder | 5,000 | $29/mo | Prod bots (10 assets x 24 checks/day) |
-| Pro | 50,000 | $99/mo | Multi-strategy systems |
-| Enterprise | Custom | Custom | Institutional use |
-
-**Developer Tier Optimization:**
-- Check every 4-6 hours (not hourly)
-- Monitor 3-5 assets max
-- 50 calls/day = 3 assets x 6 checks/day (every 4 hours)
-
-## Advanced Features
-
-### Multi-Timeframe Analysis
-
-```python
-confluence = client.get_confluence(
-    symbol="BTC",
-    timeframes=[7, 30, 90, 365]  # 1w, 1m, 3m, 1y
-)
-
-# Returns confluence across all timeframes
-print(confluence['multi_timeframe'])
-```
-
-### Backtesting (Coming Soon)
-
-```python
-from tinkclaw import BacktestEngine
-
-engine = BacktestEngine(
-    strategy=bot,
-    start_date="2025-01-01",
-    end_date="2026-01-01",
-    initial_capital=10000
-)
-
-results = engine.run()
-print(f"Total return: {results['total_return']}%")
-```
+| Free | 500 | $0 | Testing & prototyping |
+| Pro | 50,000 | $29/mo | Production bots & multi-strategy |
+| Enterprise | Unlimited | Custom | Institutional & white-label |
 
 ## Architecture
 
 ```
 Your Bot
     |
-TinkClaw SDK
+TinkClaw SDK (pip install tinkclaw)
     |
-TinkClaw API (meshcue-api.dieubuhendwa.workers.dev)
+TinkClaw API Gateway (api.tinkclaw.com)
     |
-TinkClaw Backend (Cloudflare Workers + KV)
+Quant Engine + ML Service
 ```
 
 ## Development
 
-Install dev dependencies:
-
 ```bash
 pip install -e ".[dev]"
-```
-
-Run tests:
-
-```bash
 pytest
-```
-
-Format code:
-
-```bash
-black tinkclaw/
 ```
 
 ## License
@@ -280,12 +212,13 @@ MIT License - see LICENSE file
 ## Support
 
 - **Documentation**: [https://tinkclaw.com/docs](https://tinkclaw.com/docs)
-- **API Status**: [https://meshcue-api.dieubuhendwa.workers.dev/api/signals/health](https://meshcue-api.dieubuhendwa.workers.dev/api/signals/health)
-- **Issues**: [GitHub Issues](https://github.com/tinkclaw/tinkclaw-python/issues)
+- **API Status**: [https://api.tinkclaw.com/v1/health](https://api.tinkclaw.com/v1/health)
+- **Issues**: [GitHub Issues](https://github.com/TinkClaw/tinkclaw-python/issues)
 
 ## Roadmap
 
-- [ ] Publish to PyPI
+- [x] Publish to PyPI
+- [x] Key management (info, rotation)
 - [ ] Add more broker integrations (Interactive Brokers, Coinbase)
 - [ ] Complete backtesting engine with performance metrics
 - [ ] Add WebSocket streaming for real-time signals
