@@ -11,7 +11,7 @@ pip install tinkclaw
 ## 2. Get Your API Key
 
 1. Visit [https://tinkclaw.com](https://tinkclaw.com)
-2. Sign up for free Developer tier (50 calls/day)
+2. Sign up for Free tier (500 calls/day)
 3. Copy your API key
 
 ## 3. Basic Usage
@@ -31,7 +31,36 @@ print(f"Signal: {confluence['signal']}")
 print(f"Setup: {confluence['setup_type']}")
 ```
 
-## 4. Build a Simple Bot
+## 4. Get Trading Signals
+
+```python
+# Get all signals
+signals = client.get_signals()
+for s in signals:
+    print(f"{s['asset']}: {s['signal']} ({s['confidence']}%)")
+
+# Get top signals by confidence
+top = client.get_top_signals(min_score=70, limit=5)
+for s in top:
+    print(f"{s['asset']}: {s['signal']} conf={s['confidence']}")
+
+# Filter by direction
+sells = client.get_top_signals(direction="SELL", min_score=60)
+```
+
+## 5. Multi-Timeframe Analysis
+
+```python
+# Get confluence across multiple timeframes
+confluence = client.get_confluence(
+    "BTC",
+    timeframes=[7, 30, 90, 365]  # 1w, 1m, 3m, 1y
+)
+
+print(confluence)
+```
+
+## 6. Build a Simple Bot
 
 ```python
 from tinkclaw import TinkClawClient, Strategy
@@ -54,7 +83,7 @@ bot = SimpleBot(symbols=['BTC', 'ETH'], client=client)
 bot.run(interval_hours=4)
 ```
 
-## 5. Integrate with Alpaca (Paper Trading)
+## 7. Integrate with Alpaca (Paper Trading)
 
 ```python
 from tinkclaw import TinkClawClient, Strategy
@@ -77,28 +106,21 @@ bot = SimpleBot(
 bot.run(interval_hours=4)
 ```
 
-## Rate Limits (Developer Tier)
+## Rate Limits
 
-- **50 calls/day** = 16 assets x 1 check/day OR 3 assets x 6 checks/day
-- Recommended: Check every 4-6 hours for 3-5 assets
+| Tier | Calls/Day | Price |
+|------|-----------|-------|
+| Free | 500 | $0 |
+| Pro | 50,000 | $29/mo |
+| Enterprise | Unlimited | Contact us |
 
-## Multi-Timeframe Analysis
-
-```python
-# Get confluence across multiple timeframes
-confluence = client.get_confluence(
-    symbol="BTC",
-    timeframes=[7, 30, 90, 365]  # 1w, 1m, 3m, 1y
-)
-
-print(confluence)
-```
+Recommended: Check every 4-6 hours for 3-5 assets.
 
 ## Next Steps
 
 - See `examples/momentum_bot.py` for a complete working bot
-- Explore other endpoints: `get_indicators()`, `get_history()`, `get_top_signals()`
-- Upgrade to Builder tier ($29/mo) for 5,000 calls/day
+- Explore other endpoints: `get_indicators()`, `get_screener()`, `get_top_signals()`
+- Upgrade to Pro tier ($29/mo) for 50,000 calls/day
 
 ## Support
 

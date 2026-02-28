@@ -30,7 +30,7 @@ class TinkClawClient:
         self.session = requests.Session()
         self.session.headers.update({
             'X-API-Key': api_key,
-            'User-Agent': 'TinkClaw-Python/0.3.0',
+            'User-Agent': 'TinkClaw-Python/0.5.0',
         })
         self._last_remaining = None
 
@@ -63,16 +63,43 @@ class TinkClawClient:
         Get BUY/SELL/HOLD trading signals.
 
         Args:
-            symbols: List of symbols (default: ["BTC", "ETH"])
+            symbols: List of symbols (default: all tracked assets)
 
         Returns:
-            List of signal dicts with: symbol, signal, confidence, price, target, stop_loss
+            List of signal dicts with: symbol, signal, confidence, price,
+            target, stop_loss, signal_source, trade_type, region
         """
         params = {}
         if symbols:
             params['symbols'] = ','.join(symbols)
         data = self._request('GET', '/v1/signals', params=params)
         return data.get('signals', [])
+
+    def get_top_signals(
+        self,
+        min_score: int = 60,
+        limit: int = 10,
+        direction: str = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get top trading signals sorted by confidence.
+
+        Convenience wrapper around get_signals() that filters and ranks.
+
+        Args:
+            min_score: Minimum confidence score (0-100)
+            limit: Max signals to return
+            direction: Filter by "BUY" or "SELL" (default: all)
+
+        Returns:
+            List of signal dicts sorted by confidence (descending)
+        """
+        signals = self.get_signals()
+        if direction:
+            signals = [s for s in signals if s.get("signal") == direction]
+        signals = [s for s in signals if s.get("confidence", 0) >= min_score]
+        signals.sort(key=lambda s: s.get("confidence", 0), reverse=True)
+        return signals[:limit]
 
     def get_signals_ml(self, symbols: List[str] = None) -> List[Dict[str, Any]]:
         """
@@ -106,19 +133,24 @@ class TinkClawClient:
         symbol = symbols[0] if symbols else 'BTC'
         return self._request('GET', '/v1/analysis', params={'symbol': symbol})
 
-    def get_confluence(self, symbols=None) -> Any:
+    def get_confluence(self, symbols=None, timeframes: List[int] = None) -> Any:
         """
         Get confluence score (6-layer: technical, sentiment, on-chain, macro, flow, quant).
 
         Args:
             symbols: Symbol string or list of symbols. Single symbol returns flat object.
+            timeframes: Lookback periods in days (e.g., [7, 30, 90, 365])
         """
         if isinstance(symbols, str):
             symbols = [symbols]
+        params = {}
         if symbols and len(symbols) > 1:
-            return self._request('GET', '/v1/confluence', params={'symbols': ','.join(symbols)})
-        symbol = symbols[0] if symbols else 'BTC'
-        return self._request('GET', '/v1/confluence', params={'symbol': symbol})
+            params['symbols'] = ','.join(symbols)
+        else:
+            params['symbol'] = symbols[0] if symbols else 'BTC'
+        if timeframes:
+            params['timeframes'] = ','.join(str(t) for t in timeframes)
+        return self._request('GET', '/v1/confluence', params=params)
 
     def get_indicators(self, symbol: str, range_days: int = 30) -> Dict[str, Any]:
         """
@@ -232,3 +264,68 @@ class TinkClawClient:
     def health(self) -> Dict[str, Any]:
         """Check API health (unauthenticated)."""
         return requests.get(f"{self.base_url}/v1/health", timeout=5).json()
+
+    # ==================== OPTIONS ====================
+
+    def get_options_signals(self, underlyings: List[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get options environment signals (IV rank, flow direction, Greeks context).
+        Requires Pro+ ($149/mo) or Enterprise plan.
+
+        Args:
+            underlyings: List of underlying symbols (default: all tracked).
+                         Available: AAPL, MSFT, NVDA, TSLA, AMZN, SPY, QQQ
+
+        Returns:
+            List of options signal dicts with: underlying, signal_type, severity,
+            confidence, iv, iv_rank, iv_percentile, delta, gamma, theta, vega
+        """
+        params = {}
+        if underlyings:
+            params['underlyings'] = ','.join(underlyings)
+        data = self._request('GET', '/v1/options/signals', params=params)
+        return data.get('signals', [])
+
+    # ==================== STREAMING ====================
+
+    def get_stream_token(self) -> Dict[str, Any]:
+        """
+        Get a JWT token for WebSocket streaming.
+
+        Returns:
+            Dict with: token, expires_in, ws_url, plan, limits
+        """
+        return self._request('POST', '/v1/stream/token')
+
+    def stream(self, symbols: List[str] = None, channels: List[str] = None):
+        """
+        Create a real-time streaming connection.
+
+        Requires: pip install tinkclaw[streaming]
+
+        Args:
+            symbols: Symbols to subscribe to (default: ["BTC", "ETH"])
+            channels: Channels to receive (default: ["tick", "candle:60", "signal"])
+
+        Returns:
+            TinkClawStream instance ready to start
+
+        Usage:
+            stream = client.stream(["BTC", "ETH"])
+
+            @stream.on_tick
+            def handle(tick):
+                print(f"{tick['symbol']}: ${tick['price']}")
+
+            stream.start()
+        """
+        from .streaming import TinkClawStream
+
+        token_data = self.get_stream_token()
+        s = TinkClawStream(
+            token=token_data["token"],
+            ws_url=token_data.get("ws_url", "wss://stream.tinkclaw.com"),
+        )
+        if symbols or channels:
+            s.subscribe(symbols or ["BTC", "ETH"], channels)
+        return s

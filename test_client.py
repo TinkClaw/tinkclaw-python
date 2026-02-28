@@ -6,8 +6,8 @@ Run this to verify the SDK works with the live TinkClaw API.
 
 from tinkclaw import TinkClawClient
 
-# Initialize client with test key
-client = TinkClawClient(api_key="openclaw_builder_94e48d5e6c667e3f71de7bfa5b32e920")
+# Initialize client — replace with your own API key
+client = TinkClawClient(api_key="your_api_key_here")
 
 print("=" * 60)
 print("TinkClaw SDK Test")
@@ -51,17 +51,30 @@ try:
     top_signals = client.get_top_signals(min_score=70, limit=5)
     print(f"   Found {len(top_signals)} signals")
     for signal in top_signals[:3]:
-        print(f"   - {signal.get('symbol')}: {signal.get('score')}")
+        print(f"   - {signal.get('asset', signal.get('symbol'))}: "
+              f"{signal.get('signal')} ({signal.get('confidence')}%)")
     print(f"   Success")
 except Exception as e:
     print(f"   Error: {str(e)}")
 
-# Test 5: Multi-timeframe
+# Test 5: Multi-timeframe confluence
 print("\n5. Multi-Timeframe Analysis (BTC)")
 try:
     mtf = client.get_confluence("BTC", timeframes=[7, 30, 90, 365])
     print(f"   Symbol: {mtf.get('symbol')}")
-    print(f"   Timeframes: {mtf.get('timeframes', 'N/A')}")
+    print(f"   Score: {mtf.get('score')}")
+    print(f"   Success")
+except Exception as e:
+    print(f"   Error: {str(e)}")
+
+# Test 6: Get signals
+print("\n6. Get Signals")
+try:
+    signals = client.get_signals()
+    print(f"   Total signals: {len(signals)}")
+    for s in signals[:3]:
+        print(f"   - {s.get('asset', s.get('symbol'))}: "
+              f"{s.get('signal')} conf={s.get('confidence')}")
     print(f"   Success")
 except Exception as e:
     print(f"   Error: {str(e)}")

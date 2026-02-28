@@ -95,6 +95,61 @@ class Strategy(ABC):
         """Get current position size (positive = long, negative = short)."""
         return self.positions.get(symbol, 0)
 
+    # ==================== STREAMING CALLBACKS ====================
+
+    def on_tick(self, symbol: str, tick: Dict[str, Any]) -> None:
+        """Handle real-time tick data. Override for tick-level strategies."""
+        pass
+
+    def on_candle(self, symbol: str, candle: Dict[str, Any]) -> None:
+        """Handle real-time candle close. Override for candle-based strategies."""
+        pass
+
+    def on_options_signal(self, underlying: str, signal: Dict[str, Any]) -> None:
+        """Handle real-time options signal. Override for options-aware strategies."""
+        pass
+
+    def run_streaming(self, channels: List[str] = None) -> None:
+        """
+        Run strategy with real-time streaming data (requires streaming extra).
+
+        Args:
+            channels: Channels to subscribe to (default: ["tick", "candle:60", "signal"])
+        """
+        stream = self.client.stream(self.symbols, channels)
+
+        @stream.on_tick
+        def _tick(data):
+            symbol = data.get("symbol")
+            if symbol in self.symbols:
+                self.on_tick(symbol, data)
+
+        @stream.on_candle
+        def _candle(data):
+            symbol = data.get("symbol")
+            if symbol in self.symbols:
+                self.on_candle(symbol, data)
+
+        @stream.on_signal
+        def _signal(data):
+            symbol = data.get("symbol")
+            if symbol in self.symbols:
+                self._log_signal(symbol, data)
+                self.on_signal(symbol, data)
+
+        @stream.on_options_signal
+        def _options_signal(data):
+            underlying = data.get("underlying")
+            if underlying in self.symbols:
+                self.on_options_signal(underlying, data)
+
+        @stream.on_connect
+        def _connected(info):
+            print(f"[TINKCLAW] Streaming connected: plan={info.get('plan')}")
+
+        print(f"[TINKCLAW] Starting streaming strategy for {len(self.symbols)} symbols")
+        stream.start()
+
     def _log_signal(self, symbol: str, confluence: Dict[str, Any]) -> None:
         self.signal_history.append({
             'timestamp': datetime.now().isoformat(),
