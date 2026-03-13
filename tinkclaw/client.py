@@ -5,10 +5,13 @@ Official Python SDK for TinkClaw quant intelligence API.
 Docs: https://tinkclaw.com/docs
 """
 
+import logging
 import requests
 from typing import Optional, List, Dict, Any
 
 from . import __version__
+
+log = logging.getLogger("tinkclaw.client")
 
 
 class TinkClawClient:
@@ -21,6 +24,8 @@ class TinkClawClient:
         for s in signals:
             print(f"{s['symbol']}: {s['signal']} ({s['confidence']}%)")
     """
+
+    VALID_STRATEGIES = {'hurst_momentum', 'mean_reversion', 'breakout', 'ensemble'}
 
     def __init__(
         self,
@@ -36,27 +41,62 @@ class TinkClawClient:
         })
         self._last_remaining = None
 
+    def __repr__(self) -> str:
+        # Bug #1: Mask API key more aggressively - show only first 4 chars
+        key_preview = self.api_key[:4] + "****..." if len(self.api_key) > 4 else "****"
+        return f"TinkClawClient(base_url='{self.base_url}', key='{key_preview}')"
+
+    def close(self):
+        """Close the underlying HTTP session."""
+        self.session.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def __del__(self):
+        """Clean up session on garbage collection."""
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def _request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
         """Make authenticated request to TinkClaw API."""
         url = f"{self.base_url}{endpoint}"
-        response = self.session.request(method, url, timeout=15, **kwargs)
+        try:
+            response = self.session.request(method, url, timeout=15, **kwargs)
+        except requests.Timeout:
+            # Bug #19: Separate timeout handling with clear message
+            raise RuntimeError(f"Request to {endpoint} timed out after 15 seconds")
 
         # Track rate limit
+        # Bug #3 & #17: Wrap in try/except to handle invalid values and clamp to 0
         remaining = response.headers.get('X-RateLimit-Remaining')
         if remaining is not None:
-            self._last_remaining = int(remaining)
+            try:
+                value = int(remaining)
+                # Bug #17: Clamp to non-negative
+                self._last_remaining = max(0, value)
+            except ValueError:
+                log.warning("Invalid rate limit value: %s", remaining)
 
         if response.status_code == 401:
-            raise PermissionError("Invalid API key. Register at https://tinkclaw.com")
+            # Bug #15: Change message for expired keys
+            raise PermissionError("Invalid or expired API key")
         if response.status_code == 429:
             raise RuntimeError("Rate limit exceeded. Upgrade at https://tinkclaw.com/pricing")
         response.raise_for_status()
         try:
             return response.json()
         except ValueError:
+            # Bug #13: Truncate to 100 chars and sanitize
+            sanitized_text = response.text[:100].replace('\n', ' ')
             raise RuntimeError(
                 f"Invalid JSON response from {endpoint} "
-                f"(HTTP {response.status_code}): {response.text[:200]}"
+                f"(HTTP {response.status_code}): {sanitized_text}"
             )
 
     @property
@@ -114,7 +154,7 @@ class TinkClawClient:
         Get ML-enhanced trading signals (baseline + Random Forest).
 
         Args:
-            symbols: List of symbols (default: ["BTC", "ETH"])
+            symbols: List of symbols (default: server default)
 
         Returns:
             List of ML signal dicts with: recommendation, confidence, source, baseline, ml
@@ -136,9 +176,12 @@ class TinkClawClient:
         """
         if isinstance(symbols, str):
             symbols = [symbols]
-        if symbols and len(symbols) > 1:
+        if not symbols:
+            symbols = ['BTC']
+        # Bug #12: Normalize - always use 'symbol' for single, 'symbols' for multiple
+        if len(symbols) > 1:
             return self._request('GET', '/v1/analysis', params={'symbols': ','.join(symbols)})
-        symbol = symbols[0] if symbols else 'BTC'
+        symbol = symbols[0]
         return self._request('GET', '/v1/analysis', params={'symbol': symbol})
 
     def get_confluence(self, symbols=None, timeframes: List[int] = None) -> Any:
@@ -151,11 +194,13 @@ class TinkClawClient:
         """
         if isinstance(symbols, str):
             symbols = [symbols]
+        if not symbols:
+            symbols = ['BTC']
         params = {}
-        if symbols and len(symbols) > 1:
+        if len(symbols) > 1:
             params['symbols'] = ','.join(symbols)
         else:
-            params['symbol'] = symbols[0] if symbols else 'BTC'
+            params['symbol'] = symbols[0]
         if timeframes:
             params['timeframes'] = ','.join(str(t) for t in timeframes)
         return self._request('GET', '/v1/confluence', params=params)
@@ -168,7 +213,8 @@ class TinkClawClient:
             symbol: Asset symbol
             range_days: Lookback period (7/30/90/365)
         """
-        return self._request('GET', '/v1/indicators', params={'symbols': symbol, 'range': range_days})
+        # Bug #7: Fix inconsistent param key - should be 'symbol' not 'symbols'
+        return self._request('GET', '/v1/indicators', params={'symbol': symbol, 'range': range_days})
 
     # ==================== QUANT ====================
 
@@ -201,6 +247,8 @@ class TinkClawClient:
             strategy: hurst_momentum, mean_reversion, breakout, ensemble
             days: Lookback period
         """
+        if strategy not in self.VALID_STRATEGIES:
+            raise ValueError(f"Invalid strategy '{strategy}'. Must be one of: {', '.join(sorted(self.VALID_STRATEGIES))}")
         return self._request('GET', '/v1/backtest', params={
             'symbol': symbol, 'strategy': strategy, 'days': days,
         })
@@ -235,8 +283,21 @@ class TinkClawClient:
         return self._request('GET', '/v1/api-keys/info')
 
     def health(self) -> Dict[str, Any]:
-        """Check API health (unauthenticated)."""
-        return requests.get(f"{self.base_url}/v1/health", timeout=5).json()
+        """
+        Check API health (unauthenticated).
+
+        Note: Uses 5s timeout (shorter than other endpoints) for quick liveness checks.
+        """
+        response = requests.get(f"{self.base_url}/v1/health", timeout=5)
+        try:
+            return response.json()
+        except ValueError:
+            # Bug #21: Consistent error message (also truncated)
+            sanitized_text = response.text[:100].replace('\n', ' ')
+            raise RuntimeError(
+                f"Invalid JSON from health endpoint "
+                f"(HTTP {response.status_code}): {sanitized_text}"
+            )
 
     # ==================== KEY MANAGEMENT ====================
 
@@ -276,6 +337,8 @@ class TinkClawClient:
         Returns:
             Dict with: id, url, symbol, condition, threshold, status
         """
+        if not url.startswith(('http://', 'https://')):
+            raise ValueError("Webhook URL must start with http:// or https://")
         payload = {"url": url, "symbol": symbol, "condition": condition}
         if threshold is not None:
             payload["threshold"] = threshold
