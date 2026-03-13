@@ -51,7 +51,13 @@ class TinkClawClient:
         if response.status_code == 429:
             raise RuntimeError("Rate limit exceeded. Upgrade at https://tinkclaw.com/pricing")
         response.raise_for_status()
-        return response.json()
+        try:
+            return response.json()
+        except ValueError:
+            raise RuntimeError(
+                f"Invalid JSON response from {endpoint} "
+                f"(HTTP {response.status_code}): {response.text[:200]}"
+            )
 
     @property
     def calls_remaining(self) -> Optional[int]:
