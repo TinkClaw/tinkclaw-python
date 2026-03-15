@@ -61,11 +61,11 @@ async def main():
 
 | Plan | Calls/Day | Symbols | Streaming | Price |
 |------|-----------|---------|-----------|-------|
-| **Free** | 50 | 5 (BTC, ETH, SOL, AAPL, EURUSD) | No | $0 |
-| **Pro** | 5,000 | All 62 | WebSocket, real-time | $9.99/mo |
-| **Pro+** | Unlimited | All 62 | WebSocket, real-time | $19.99/mo |
+| **Free** | No API | SmartChart access | No | $0 |
+| **Pro** | 50 | All 62 | WebSocket, real-time | $9.99/mo |
+| **Pro+** | 100 | All 62 | WebSocket, real-time | $19.99/mo |
 
-**Free** includes `/signals`, basic pattern detection, and community support.
+**Free** includes full SmartChart access with live signals — no API access.
 **Pro** adds ML scoring, order flow (VPIN), regime detection, and email support.
 **Pro+** adds full confluence analysis, signal history export (90 days), webhook alerts, and priority support.
 
