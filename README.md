@@ -2,7 +2,7 @@
 
 Official Python client for the [TinkClaw](https://tinkclaw.com) trading signals API.
 
-Real-time AI-powered signals across 62 assets — stocks, crypto, forex, and commodities.
+Real-time AI-powered signals across 60+ assets — stocks, crypto, forex, and commodities.
 
 ## Install
 
@@ -59,15 +59,17 @@ async def main():
 
 ## Plans
 
-| Plan | Calls/Day | Symbols | Streaming | Price |
-|------|-----------|---------|-----------|-------|
-| **Free** | No API | SmartChart access | No | $0 |
-| **Pro** | 50 | All 62 | WebSocket, real-time | $9.99/mo |
-| **Pro+** | 100 | All 62 | WebSocket, real-time | $19.99/mo |
+| Plan | Credits/Month | Symbols | Streaming | Price |
+|------|---------------|---------|-----------|-------|
+| **Sandbox** | 100 | 5 (BTC, ETH, SOL, AAPL, EURUSD) | No | $0 |
+| **Developer** | 5,000 | All 60+ | WebSocket, real-time | $29/mo |
+| **Pro** | 15,000 | All 60+ | WebSocket, real-time | $79/mo |
+| **Commercial** | 50,000 | All 60+ | WebSocket, real-time, priority | $299/mo |
 
-**Free** includes full SmartChart access with live signals — no API access.
-**Pro** adds ML scoring, order flow (VPIN), regime detection, and email support.
-**Pro+** adds full confluence analysis, signal history export (90 days), webhook alerts, and priority support.
+**Sandbox** includes `/signals`, basic pattern detection, and community support.
+**Developer** adds ML scoring, order flow (VPIN), regime detection, and email support.
+**Pro** adds full confluence analysis, signal history export (90 days), webhook alerts, and priority support.
+**Commercial** adds dedicated support, SLA guarantees, and custom integrations.
 
 ## API Reference
 
