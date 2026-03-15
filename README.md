@@ -80,7 +80,7 @@ async def main():
 | `analysis(symbol)` | Full market analysis |
 | `confluence(symbol)` | 6-layer confluence score |
 | `indicators(symbol)` | Technical indicators |
-| `quant(symbol)` | MFDFA + Hurst exponent |
+| `quant(symbol)` | Fractal analysis + trend persistence |
 | `risk_metrics(symbol)` | Sharpe, VaR, drawdown |
 | `correlation()` | Cross-asset correlations |
 | `screener()` | All assets ranked |
